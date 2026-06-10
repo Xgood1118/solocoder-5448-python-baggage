@@ -13,13 +13,13 @@ from app.modules.simulator import router as simulator_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print(f"🚀 Baggage Tracking Service starting on port {settings.PORT}")
-    print(f"📦 Environment: {settings.ENV}")
-    print(f"⏱️  Lost threshold: {settings.LOST_THRESHOLD_MINUTES} minutes")
-    print(f"✈️  Domestic delay compensation: {settings.DELAY_DOMESTIC_HOURS}h")
-    print(f"🌍 International delay compensation: {settings.DELAY_INTL_HOURS}h")
+    print(f"[START] Baggage Tracking Service on port {settings.PORT}")
+    print(f"[INFO]  Environment: {settings.ENV}")
+    print(f"[INFO]  Lost threshold: {settings.LOST_THRESHOLD_MINUTES} minutes")
+    print(f"[INFO]  Domestic delay compensation: {settings.DELAY_DOMESTIC_HOURS}h")
+    print(f"[INFO]  International delay compensation: {settings.DELAY_INTL_HOURS}h")
     yield
-    print("🛑 Baggage Tracking Service shutting down...")
+    print("[STOP] Baggage Tracking Service shutting down...")
 
 
 app = FastAPI(

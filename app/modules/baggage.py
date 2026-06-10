@@ -15,26 +15,43 @@ def _generate_tag_id() -> str:
 
 @router.post("/", response_model=Baggage)
 async def create_baggage(baggage_in: dict):
-    tag_id = baggage_in.get("tag_id") or _generate_tag_id()
+    required_fields = ["passenger_name", "ticket_number", "flight_number", "weight_kg", "destination", "origin"]
+    missing = [f for f in required_fields if f not in baggage_in or baggage_in[f] is None]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing required fields: {', '.join(missing)}")
+
+    raw_tag_id = baggage_in.get("tag_id")
+    if raw_tag_id:
+        if not isinstance(raw_tag_id, str) or len(raw_tag_id) != 10 or not raw_tag_id.isdigit():
+            raise HTTPException(status_code=400, detail="tag_id must be a 10-digit numeric string")
+        tag_id = raw_tag_id
+    else:
+        tag_id = _generate_tag_id()
 
     if storage.get_baggage(tag_id):
-        raise HTTPException(status_code=400, detail="Tag ID already exists")
+        raise HTTPException(status_code=409, detail=f"Tag ID {tag_id} already exists")
 
     flight = storage.get_flight(baggage_in.get("flight_number", ""))
     is_international = flight.is_international if flight else baggage_in.get("is_international", False)
 
-    baggage = Baggage(
-        tag_id=tag_id,
-        passenger_name=baggage_in["passenger_name"],
-        ticket_number=baggage_in["ticket_number"],
-        flight_number=baggage_in["flight_number"],
-        weight_kg=baggage_in["weight_kg"],
-        declared_value=baggage_in.get("declared_value"),
-        destination=baggage_in["destination"],
-        origin=baggage_in["origin"],
-        language=baggage_in.get("language", "zh"),
-        is_international=is_international,
-    )
+    if not isinstance(baggage_in["weight_kg"], (int, float)) or baggage_in["weight_kg"] <= 0:
+        raise HTTPException(status_code=400, detail="weight_kg must be a positive number")
+
+    try:
+        baggage = Baggage(
+            tag_id=tag_id,
+            passenger_name=str(baggage_in["passenger_name"]).strip(),
+            ticket_number=str(baggage_in["ticket_number"]).strip(),
+            flight_number=str(baggage_in["flight_number"]).strip(),
+            weight_kg=float(baggage_in["weight_kg"]),
+            declared_value=baggage_in.get("declared_value"),
+            destination=str(baggage_in["destination"]).strip(),
+            origin=str(baggage_in["origin"]).strip(),
+            language=baggage_in.get("language", "zh"),
+            is_international=is_international,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid baggage data: {str(e)}")
 
     result = storage.add_baggage(baggage)
     await send_status_notification(tag_id, BaggageStatus.CHECKED_IN)

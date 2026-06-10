@@ -3,7 +3,7 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.models.lost import LostRecord, LostStatus
-from app.models.anomaly import AnomalyType
+from app.models.anomaly import AnomalyRecord, AnomalyType, AnomalySeverity
 from app.storage.memory import storage
 from app.utils import generate_id
 from app.config import settings
@@ -71,8 +71,6 @@ async def report_lost_baggage(report_in: dict):
 
     storage.add_lost_record(record)
 
-    from app.models.anomaly import AnomalyRecord, AnomalySeverity
-    from app.modules.anomaly import generate_id
     anomaly = AnomalyRecord(
         anomaly_id=generate_id("LST"),
         tag_id=tag_id,
@@ -102,7 +100,7 @@ async def mark_found(lost_id: str, location: str = "unknown"):
 
     anomalies = storage.get_anomalies_by_tag(record.tag_id)
     for anomaly in anomalies:
-        if anomaly.anomaly_type == "lost":
+        if anomaly.anomaly_type == AnomalyType.LOST:
             storage.update_anomaly(anomaly.anomaly_id, resolved=True, resolved_at=datetime.utcnow())
 
     storage.update_baggage_status(record.tag_id, "unloaded")
@@ -187,9 +185,11 @@ async def reroute_misrouted_baggage(tag_id: str, correct_flight_number: str):
 
     target_flight = storage.get_flight(correct_flight_number)
     if not target_flight:
-        storage.reassign_baggage_flight(tag_id, correct_flight_number)
-        baggage.destination = target_flight.destination
-        baggage.is_international = target_flight.is_international
+        raise HTTPException(status_code=404, detail=f"Target flight {correct_flight_number} not found")
+
+    storage.reassign_baggage_flight(tag_id, correct_flight_number)
+    baggage.destination = target_flight.destination
+    baggage.is_international = target_flight.is_international
 
     storage.update_anomaly(
         misrouted_anomaly.anomaly_id,

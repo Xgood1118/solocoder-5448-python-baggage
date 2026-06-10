@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from typing import List, Optional
 from datetime import datetime, timedelta
+from pydantic import BaseModel
 import random
 import asyncio
 
@@ -58,7 +59,18 @@ async def seed_flights(count: int = 5, domestic_ratio: float = 0.6):
 
 
 @router.post("/seed-baggage")
-async def seed_baggage(flight_number: str, count: int = 50):
+async def seed_baggage(
+    flight_number: Optional[str] = None,
+    count: int = 50,
+    body: Optional[dict] = Body(default=None),
+):
+    if body:
+        flight_number = body.get("flight_number", flight_number)
+        count = body.get("count", count)
+
+    if not flight_number:
+        raise HTTPException(status_code=400, detail="flight_number is required")
+
     flight = storage.get_flight(flight_number)
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
